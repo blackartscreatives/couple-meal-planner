@@ -1,0 +1,5 @@
+{
+  "name": "Couple's Meal Planner",
+  "description": "A collaborative meal planning and grocery list app for couples, featuring an AI assistant for recipe suggestions. Designed for a Sri Lankan couple in Australia, this app helps organize meals for two weeks, automatically generates grocery lists, and allows real-time updates.",
+  "requestFramePermissions": []
+}
