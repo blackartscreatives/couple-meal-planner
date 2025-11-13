@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { RecipeDetails, DietPreference } from "../types";
 
@@ -40,7 +41,7 @@ export async function getAiResponse(prompt: string, dietPreference: DietPreferen
         systemInstruction: getSystemInstruction(dietPreference),
       },
     });
-    return response.text;
+    return response.text ?? "Sorry, I couldn't fetch a response. Please try again.";
   } catch (error) {
     console.error("Error fetching AI response:", error);
     return "Sorry, I couldn't fetch a response. Please try again.";
@@ -57,7 +58,7 @@ export async function getIngredientsForMeal(mealName: string, dietPreference: Di
         systemInstruction: getSystemInstruction(dietPreference),
       },
     });
-    return response.text;
+    return response.text ?? "";
   } catch (error) {
     console.error("Error fetching ingredients:", error);
     return "";
@@ -81,7 +82,8 @@ export async function getInitialMealSuggestions(dietPreference: DietPreference):
         },
       },
     });
-    const jsonStr = response.text.trim();
+    const jsonStr = (response.text ?? '').trim();
+    if (!jsonStr) return []; // Return empty array if response is empty
     return JSON.parse(jsonStr);
   } catch (error) {
     console.error("Error fetching meal suggestions:", error);
@@ -113,10 +115,53 @@ async function fetchRecipeAndIngredients(mealName: string, dietPreference: DietP
                 },
             },
         });
-        const jsonStr = response.text.trim();
+        const jsonStr = (response.text ?? '').trim();
+        if (!jsonStr) throw new Error("Empty JSON response for recipe details.");
         return JSON.parse(jsonStr);
     } catch (error) {
         console.error("Error parsing recipe JSON:", error);
         // Fallback to text-based extraction if JSON fails.
         const recipeText = await getAiResponse(`Provide a simple, step-by-step recipe for a ${dietContext} version of ${mealName}. Format the response using Markdown. Include a title, a short description, an ingredients list, and instructions.`, dietPreference);
-        const ingredientsText = await getIngredientsForMeal(mealName, dietPreference
+        const ingredientsText = await getIngredientsForMeal(mealName, dietPreference);
+        return { recipe: recipeText, ingredients: ingredientsText };
+    }
+}
+
+
+async function fetchImage(mealName: string, dietPreference: DietPreference): Promise<string> {
+    const dietContext = getDietaryString(dietPreference);
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: {
+            parts: [{ text: `A vibrant, appetizing, high-quality photo of a freshly made ${dietContext} version of ${mealName}, plated beautifully on a clean, modern dish.` }],
+        },
+        config: {
+            responseModalities: [Modality.IMAGE],
+        },
+    });
+    for (const part of response.candidates?.[0]?.content?.parts ?? []) {
+        // Fix: Add a more robust check to ensure inlineData and its data property exist.
+        if (part.inlineData?.data) {
+            const base64ImageBytes = part.inlineData.data;
+            return `data:image/png;base64,${base64ImageBytes}`;
+        }
+    }
+    return "";
+}
+
+export async function getRecipeDetails(mealName: string, dietPreference: DietPreference): Promise<RecipeDetails> {
+  try {
+    const [recipeData, imageUrl] = await Promise.all([
+      fetchRecipeAndIngredients(mealName, dietPreference),
+      fetchImage(mealName, dietPreference),
+    ]);
+    return { ...recipeData, imageUrl };
+  } catch (error) {
+    console.error(`Error fetching details for ${mealName}:`, error);
+    return {
+      recipe: "Sorry, I couldn't fetch the recipe. Please try again.",
+      imageUrl: "",
+      ingredients: "",
+    };
+  }
+}

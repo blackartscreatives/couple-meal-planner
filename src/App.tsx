@@ -146,7 +146,7 @@ const App: React.FC = () => {
       }
       Object.entries(dayMeals).forEach(([mealType, meal]) => {
         if (allowedMealTypes.has(mealType as MealType) && meal && typeof meal === 'object' && meal.ingredients) {
-          meal.ingredients.split(',').forEach(ing => {
+          meal.ingredients.split(',').forEach((ing: string) => {
             const trimmedIng = ing.trim().toLowerCase();
             if (trimmedIng) {
               allIngredients.add(trimmedIng);
